@@ -2,8 +2,6 @@ package com.simplify4me.casslist.support;
 
 import java.util.Date;
 
-import org.apache.cassandra.thrift.Mutation;
-
 import com.netflix.astyanax.ColumnListMutation;
 import com.netflix.astyanax.Keyspace;
 import com.netflix.astyanax.MutationBatch;

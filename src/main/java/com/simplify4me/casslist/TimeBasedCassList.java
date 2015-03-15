@@ -5,6 +5,8 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
+import javax.annotation.Nonnull;
+
 import com.simplify4me.casslist.support.CassListCF;
 import com.simplify4me.casslist.support.TimeBasedCassListIndexBuilder;
 
@@ -33,7 +35,8 @@ public class TimeBasedCassList implements CassList {
 
     private CassListReadPolicy defaultReadPolicy = null;
 
-    public TimeBasedCassList(CassListCF cassListCF, TimeBasedCassListIndexBuilder indexBuilder) throws ConnectionException {
+    public TimeBasedCassList(@Nonnull CassListCF cassListCF,
+                             @Nonnull TimeBasedCassListIndexBuilder indexBuilder) throws ConnectionException {
         this.cassList = cassListCF;
         this.indexBuilder = indexBuilder;
         this.defaultReadPolicy = TimeBasedCassListReadPolicy.LookbackInTimeReadPolicy.lookback5MinsPolicy(indexBuilder);
@@ -45,12 +48,12 @@ public class TimeBasedCassList implements CassList {
     }
 
     @Override
-    public void setDefaultReadPolicy(TimeBasedCassListReadPolicy readPolicy) {
+    public void setDefaultReadPolicy(@Nonnull TimeBasedCassListReadPolicy readPolicy) {
         this.defaultReadPolicy = readPolicy;
     }
 
     @Override
-    public String add(String value) throws ConnectionException {
+    public String add(@Nonnull String value) throws ConnectionException {
         final MutationBatch mutationBatch = cassList.prepareMutationBatch(ConsistencyLevel.CL_LOCAL_QUORUM);
         final String rowKey = add(mutationBatch, value);
         mutationBatch.execute();
@@ -72,7 +75,7 @@ public class TimeBasedCassList implements CassList {
     }
 
     @Override
-    public CassListEntries read(CassListReadPolicy readPolicy) throws ConnectionException {
+    public CassListEntries read(@Nonnull CassListReadPolicy readPolicy) throws ConnectionException {
         String rowKey = readPolicy.nextRowToRead();
         while (rowKey != null) {
             //System.out.println("rk=" + rowKey);
@@ -103,12 +106,10 @@ public class TimeBasedCassList implements CassList {
     }
 
     @Override
-    public void markAsRead(CassListEntries entry) throws ConnectionException {
-        if (entry != null) {
-            final MutationBatch mutationBatch = cassList.prepareMutationBatch(ConsistencyLevel.CL_LOCAL_QUORUM);
-            final ColumnListMutation<UUID> mutation = mutationBatch.withRow(cassList, entry.getReferenceID());
-            entry.getEntries().forEach(e -> mutation.putColumn(e.getName(), "null", ONE_SEC));
-            mutationBatch.execute();
-        }
+    public void markAsRead(@Nonnull CassListEntries entry) throws ConnectionException {
+        final MutationBatch mutationBatch = cassList.prepareMutationBatch(ConsistencyLevel.CL_LOCAL_QUORUM);
+        final ColumnListMutation<UUID> mutation = mutationBatch.withRow(cassList, entry.getReferenceID());
+        entry.getEntries().forEach(e -> mutation.putColumn(e.getName(), "null", ONE_SEC));
+        mutationBatch.execute();
     }
 }
