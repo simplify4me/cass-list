@@ -1,7 +1,5 @@
 package com.simplify4me.casslist;
 
-import java.util.UUID;
-
 import com.simplify4me.casslist.support.TimeBasedCassListIndexBuilder;
 
 /**
@@ -19,39 +17,33 @@ public interface TimeBasedCassListReadPolicy extends CassListReadPolicy {
     void reset() throws UnsupportedOperationException;
 
     class LookbackInTimeReadPolicy implements TimeBasedCassListReadPolicy {
-        private final long initialValue;
+        private final long initialStartTimeMillis;
         private final TimeBasedCassListIndexBuilder indexBuilder;
 
-        private volatile long time = 0;
-        private volatile long startFromSec = 0;
+        private volatile long startFromMillis = 0;
 
-        public LookbackInTimeReadPolicy(TimeBasedCassListIndexBuilder indexBuilder, long startFromSec) {
+        public LookbackInTimeReadPolicy(TimeBasedCassListIndexBuilder indexBuilder, long startFromMillis) {
             this.indexBuilder = indexBuilder;
-            this.initialValue = this.startFromSec = startFromSec;
-            this.time = now();
+            this.initialStartTimeMillis = this.startFromMillis = startFromMillis;
         }
 
         @Override
         public String nextRowToRead() {
-            if (startFromSec > (time-1)) {
-                time = now();
-                if (startFromSec > (time-1)) return null;
+            long now = System.currentTimeMillis();
+            if (startFromMillis >= now) { //avoid reading the currently being written or future row
+                return null;
             }
-            return indexBuilder.build(startFromSec++);
-        }
-
-        private static long now() {
-            return System.currentTimeMillis()/1000;
+            return indexBuilder.build(startFromMillis++);
         }
 
         @Override
         public void reset() {
-            this.startFromSec = initialValue;
+            this.startFromMillis = initialStartTimeMillis;
         }
 
         public static CassListReadPolicy lookback5MinsPolicy(TimeBasedCassListIndexBuilder indexBuilder) {
-            final long startFromSec = (now()) - 300; //5 mins
-            return new LookbackInTimeReadPolicy(indexBuilder, startFromSec);
+            final long startFrom = (System.currentTimeMillis() - (5 * 60 * 1000)); //5 mins
+            return new LookbackInTimeReadPolicy(indexBuilder, startFrom);
         }
     }
 }

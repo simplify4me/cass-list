@@ -14,7 +14,11 @@ public final class TimeBasedCassListIndexBuilder {
         this.listName = listName;
     }
 
-    public String build(long timeInSecs) {
-        return listName + "." + timeInSecs;
+    public String build() {
+        return build(System.currentTimeMillis());
+    }
+
+    public String build(long timeInMillis) {
+        return listName + "." + (timeInMillis/1000);
     }
 }

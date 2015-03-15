@@ -59,15 +59,11 @@ public class TimeBasedCassList implements CassList {
 
     @Override
     public String add(MutationBatch mutationBatch, String value) throws ConnectionException {
-        final String rowKey = indexBuilder.build(currentRowKey());
+        final String rowKey = indexBuilder.build();
         final UUID timeUUID = TimeUUIDUtils.getTimeUUID(System.currentTimeMillis());
         mutationBatch.withRow(cassList, rowKey)
             .putColumn(timeUUID, value, entryExpiryInSecs);
         return rowKey;
-    }
-
-    protected long currentRowKey() {
-        return System.currentTimeMillis()/1000;
     }
 
     @Override
