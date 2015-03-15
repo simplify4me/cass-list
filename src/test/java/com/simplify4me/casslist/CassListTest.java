@@ -6,6 +6,8 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.simplify4me.casslist.support.CassListCF;
+import com.simplify4me.casslist.support.TimeBasedCassListIndexBuilder;
 import junit.framework.Assert;
 
 import com.netflix.astyanax.AstyanaxContext;
@@ -49,18 +51,17 @@ public class CassListTest {
 
     @Test
     public void testReadWrite() throws Exception {
-        final Keyspace ks = context.getClient();
+        CassListCF cassListCF = new CassListCF(context.getClient(), "llist");
 
         final int numValues = 10;
 
-        CassList cassList = new TimeBasedCassList(ks, "llist");
+        CassList cassList = new TimeBasedCassList(cassListCF, new TimeBasedCassListIndexBuilder());
         writeABunchOfValues(cassList, numValues);
-        CassListEntries entry = null;//cassList.readFromHEAD();
-        //cassList.markAsRead(entry);
-        System.out.println("rh=" + entry);
 
         int totalRead = 0;
-        while ((entry = cassList.read()) != null) {
+
+        for (CassListEntries entry = cassList.read(); entry != null; entry = cassList.read()) {
+            System.out.println("eid=" + entry.getReferenceID());
             cassList.markAsRead(entry);
             totalRead += entry.size();
             System.out.println(entry);
@@ -89,7 +90,7 @@ public class CassListTest {
     private static void writeABunchOfValues(CassList cassList, int numValues) throws Exception {
         Random random = new Random();
         for (int index = 0; index < 10; index++) {
-            cassList.add("id." + index, String.valueOf(index));
+            cassList.add(String.valueOf(index));
             Thread.sleep(random.nextInt(1000));
         }
         System.out.println("done writing");

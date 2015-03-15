@@ -1,5 +1,9 @@
 package com.simplify4me.casslist;
 
+import java.util.UUID;
+
+import com.simplify4me.casslist.support.TimeBasedCassListIndexBuilder;
+
 /**
  * A policy that drives which values are read from the list, based on a time.
  */
@@ -14,35 +18,26 @@ public interface TimeBasedCassListReadPolicy extends CassListReadPolicy {
      */
     void reset() throws UnsupportedOperationException;
 
-    /**
-     * Returns the next time 'slot' to read. The behavior of this method shall be
-     * implementation specific and 'next' in the method name does not necessarily
-     * indicate an incremental next value and no ordering guarantees are made for
-     * the values returned
-     *
-     * This method shall not throw an exception and fail.
-     *
-     * @return the next time or a value of 0 to indicate nothing to read
-     */
-    long nextRowToRead();
-
     class LookbackInTimeReadPolicy implements TimeBasedCassListReadPolicy {
         private final long initialValue;
+        private final TimeBasedCassListIndexBuilder indexBuilder;
+
         private volatile long time = 0;
         private volatile long startFromSec = 0;
 
-        public LookbackInTimeReadPolicy(long startFromSec) {
+        public LookbackInTimeReadPolicy(TimeBasedCassListIndexBuilder indexBuilder, long startFromSec) {
+            this.indexBuilder = indexBuilder;
             this.initialValue = this.startFromSec = startFromSec;
             this.time = now();
         }
 
         @Override
-        public long nextRowToRead() {
+        public String nextRowToRead() {
             if (startFromSec > (time-1)) {
                 time = now();
-                if (startFromSec > (time-1)) return 0;
+                if (startFromSec > (time-1)) return null;
             }
-            return startFromSec++;
+            return indexBuilder.build(startFromSec++);
         }
 
         private static long now() {
@@ -54,9 +49,9 @@ public interface TimeBasedCassListReadPolicy extends CassListReadPolicy {
             this.startFromSec = initialValue;
         }
 
-        public static CassListReadPolicy lookback5MinsPolicy() {
+        public static CassListReadPolicy lookback5MinsPolicy(TimeBasedCassListIndexBuilder indexBuilder) {
             final long startFromSec = (now()) - 300; //5 mins
-            return new LookbackInTimeReadPolicy(startFromSec);
+            return new LookbackInTimeReadPolicy(indexBuilder, startFromSec);
         }
     }
 }

@@ -1,16 +1,21 @@
 package com.simplify4me.casslist;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 
-import com.netflix.astyanax.Keyspace;
+import com.simplify4me.casslist.support.CassListCF;
+import com.simplify4me.casslist.support.TimeBasedCassListIndexBuilder;
+
+import com.netflix.astyanax.ColumnListMutation;
 import com.netflix.astyanax.MutationBatch;
-import com.netflix.astyanax.model.Column;
-import com.netflix.astyanax.model.ColumnFamily;
-import com.netflix.astyanax.model.ColumnList;
-import com.netflix.astyanax.query.RowQuery;
-import com.netflix.astyanax.serializers.StringSerializer;
 import com.netflix.astyanax.connectionpool.exceptions.ConnectionException;
+import com.netflix.astyanax.model.Column;
+import com.netflix.astyanax.model.ColumnList;
+import com.netflix.astyanax.model.ConsistencyLevel;
+import com.netflix.astyanax.query.RowQuery;
+import com.netflix.astyanax.util.TimeUUIDUtils;
 
 /**
  * Time indexed list (i.e. list indicies are timestamps) where values are stored at a
@@ -19,25 +24,19 @@ import com.netflix.astyanax.connectionpool.exceptions.ConnectionException;
 public class TimeBasedCassList implements CassList {
 
     private static final Integer FIVE_MINS_IN_SECS = Integer.valueOf(600);
-    private static final String ROW_READ_COL = "cl.read";
+    private static final Integer ONE_SEC = Integer.valueOf(1);
 
     private Integer entryExpiryInSecs = FIVE_MINS_IN_SECS;
 
-    private final String listName;
-    private final Keyspace keyspace;
-    private final ColumnFamily<String, String> cassList;
+    private final CassListCF cassList;
+    private final TimeBasedCassListIndexBuilder indexBuilder;
 
-    private TimeBasedCassListReadPolicy defaultReadPolicy = null;
+    private CassListReadPolicy defaultReadPolicy = null;
 
-    public TimeBasedCassList(Keyspace keyspace, String listCFName) throws ConnectionException {
-        this(keyspace, listCFName, "default");
-    }
-
-    public TimeBasedCassList(Keyspace keyspace, String listCFName, String listName) throws ConnectionException {
-        this.keyspace = keyspace;
-        this.listName = listName;
-        this.cassList = new ColumnFamily<>(listCFName, StringSerializer.get(), StringSerializer.get());
-        this.defaultReadPolicy = new TimeBasedCassListReadPolicy.LookbackInTimeReadPolicy(currentRowKey() - FIVE_MINS_IN_SECS.intValue());
+    public TimeBasedCassList(CassListCF cassListCF, TimeBasedCassListIndexBuilder indexBuilder) throws ConnectionException {
+        this.cassList = cassListCF;
+        this.indexBuilder = indexBuilder;
+        this.defaultReadPolicy = TimeBasedCassListReadPolicy.LookbackInTimeReadPolicy.lookback5MinsPolicy(indexBuilder);
     }
 
     @Override
@@ -51,19 +50,19 @@ public class TimeBasedCassList implements CassList {
     }
 
     @Override
-    public String add(String key, String value) throws ConnectionException {
-        final MutationBatch mutationBatch = keyspace.prepareMutationBatch();
-        final String rowKey = add(mutationBatch, key, value);
+    public String add(String value) throws ConnectionException {
+        final MutationBatch mutationBatch = cassList.prepareMutationBatch(ConsistencyLevel.CL_LOCAL_QUORUM);
+        final String rowKey = add(mutationBatch, value);
         mutationBatch.execute();
         return rowKey;
     }
 
     @Override
-    public String add(MutationBatch mutationBatch, String key, String value) throws ConnectionException {
-        final String rowKey = listName + currentRowKey();
+    public String add(MutationBatch mutationBatch, String value) throws ConnectionException {
+        final String rowKey = indexBuilder.build(currentRowKey());
+        final UUID timeUUID = TimeUUIDUtils.getTimeUUID(System.currentTimeMillis());
         mutationBatch.withRow(cassList, rowKey)
-            .putColumn(key, value, entryExpiryInSecs)
-            .putColumn(ROW_READ_COL, false, entryExpiryInSecs);
+            .putColumn(timeUUID, value, entryExpiryInSecs);
         return rowKey;
     }
 
@@ -77,50 +76,43 @@ public class TimeBasedCassList implements CassList {
     }
 
     @Override
-    public CassListEntries read(TimeBasedCassListReadPolicy readPolicy) throws ConnectionException {
-        long rowToRead = readPolicy.nextRowToRead();
-        while (rowToRead > 0) {
-            final String rowKey = listName + rowToRead;
-            final ColumnList<String> unreadRow = getUnreadRow(rowKey);
-            if (unreadRow != null && !unreadRow.isEmpty()) {
-                return new CassListEntries(rowKey, buildMap(unreadRow));
+    public CassListEntries read(CassListReadPolicy readPolicy) throws ConnectionException {
+        String rowKey = readPolicy.nextRowToRead();
+        while (rowKey != null) {
+            //System.out.println("rk=" + rowKey);
+            final Set<Column<UUID>> unreadRow = getUnreadRow(rowKey);
+            if (!unreadRow.isEmpty()) {
+                return new CassListEntries(rowKey, unreadRow);
             }
-            rowToRead = readPolicy.nextRowToRead();
+            rowKey = readPolicy.nextRowToRead();
         }
         return null;
     }
 
-    private Map<String, String> buildMap(final ColumnList<String> unreadRow) {
-        Map<String, String> entries = new HashMap<>(unreadRow.size(), 1.0f);
-        for (int col = 0; col < unreadRow.size(); col++) {
-            final Column<String> column = unreadRow.getColumnByIndex(col);
-            if (!ROW_READ_COL.equals(column.getName())) {
-                entries.put(column.getName(), column.getStringValue());
-            }
-        }
-        return entries;
-    }
-
-    protected ColumnList<String> getUnreadRow(String rowKey) throws ConnectionException {
-        final RowQuery<String, String> key = keyspace.prepareQuery(cassList).getKey(rowKey);
-        final ColumnList<String> result = key.execute().getResult();
+    protected Set<Column<UUID>> getUnreadRow(String rowKey) throws ConnectionException {
+        Set<Column<UUID>> entries = null;
+        final RowQuery<String, UUID> key = cassList.prepareQuery(ConsistencyLevel.CL_LOCAL_QUORUM).getKey(rowKey);
+        final ColumnList<UUID> result = key.execute().getResult();
         if (result.size() > 0) {
-            final Column<String> columnByName = result.getColumnByName(ROW_READ_COL);
-            if (columnByName != null && !columnByName.getBooleanValue()) {
-                return result;
+            for (int index = 0; index < result.size(); index++) {
+                final Column<UUID> column = result.getColumnByIndex(index);
+                if (column.getStringValue() != null && !"null".equals(column.getStringValue())) {
+                    if (entries == null) entries = new HashSet<>(result.size(), 1.0f);
+                    System.out.println("ttl=" + column.getTtl());
+                    entries.add(column);
+                }
             }
         }
-        return null;
+        return entries == null ? Collections.emptySet() : entries;
     }
 
     @Override
     public void markAsRead(CassListEntries entry) throws ConnectionException {
-        if (entry != null) ack(entry.getReferenceID());
-    }
-
-    protected void ack(String rowKey) throws ConnectionException {
-        final MutationBatch mutationBatch = keyspace.prepareMutationBatch();
-        mutationBatch.withRow(cassList, rowKey).putColumn(ROW_READ_COL, true);
-        mutationBatch.execute();
+        if (entry != null) {
+            final MutationBatch mutationBatch = cassList.prepareMutationBatch(ConsistencyLevel.CL_LOCAL_QUORUM);
+            final ColumnListMutation<UUID> mutation = mutationBatch.withRow(cassList, entry.getReferenceID());
+            entry.getEntries().forEach(e -> mutation.putColumn(e.getName(), "null", ONE_SEC));
+            mutationBatch.execute();
+        }
     }
 }

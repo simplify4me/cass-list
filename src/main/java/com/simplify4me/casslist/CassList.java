@@ -35,23 +35,21 @@ public interface CassList {
     /**
      * Add an entry to the list
      *
-     * @param key key
      * @param value value
      * @return rowKey for row where the (key-value) were stored
      * @throws ConnectionException
      */
-    String add(String key, String value) throws ConnectionException;
+    String add(String value) throws ConnectionException;
 
     /**
      * Add an entry to the list using a mutation batch that's already part of your write. Handy
      * for batching writes.
      *
-     * @param key key
      * @param value value
      * @return rowKey for row where the (key-value) were stored
      * @throws ConnectionException
      */
-    String add(MutationBatch mutationBatch, String key, String value) throws ConnectionException;
+    String add(MutationBatch mutationBatch, String value) throws ConnectionException;
 
     /**
      * Read a set of entries based on the default read policy
@@ -68,7 +66,7 @@ public interface CassList {
      * @return entries read or null, if none available
      * @throws ConnectionException
      */
-    CassListEntries read(TimeBasedCassListReadPolicy readPolicy) throws ConnectionException;
+    CassListEntries read(CassListReadPolicy readPolicy) throws ConnectionException;
 
     /**
      * Mark the set of entries as read to avoid the same entries being returned by read, if desired.
