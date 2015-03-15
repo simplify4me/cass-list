@@ -14,3 +14,5 @@ deployed across data centers, especially when
 
 Its simpler to take advantage of cassandra replication, especially when the source data is
 already in Cassandra
+
+See com.simplify4me.casslist.CassListTest for usage
