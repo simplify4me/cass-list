@@ -4,22 +4,30 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.UUID;
 
+import javax.annotation.Nonnull;
+
 import com.netflix.astyanax.model.Column;
 
 /**
  * A collection of entries in the CassList
  */
 public class CassListEntries {
-    private String referenceID = null;
-    private Set<Column<UUID>> entries = null;
+    private final String referenceID;
+    private final String consumerName;
+    private final Set<Column<UUID>> entries;
 
-    public CassListEntries(String referenceID, Set<Column<UUID>> entries) {
+    public CassListEntries(@Nonnull String consumerName, @Nonnull String referenceID, @Nonnull Set<Column<UUID>> entries) {
+        this.consumerName = consumerName;
         this.referenceID = referenceID;
         this.entries = entries;
     }
 
     public String getReferenceID() {
         return referenceID;
+    }
+
+    public String getConsumerName() {
+        return consumerName;
     }
 
     public Iterator<String> iterator() {
