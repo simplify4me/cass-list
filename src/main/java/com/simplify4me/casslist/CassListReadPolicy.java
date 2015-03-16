@@ -20,4 +20,15 @@ public interface CassListReadPolicy {
      * @return a row key to read or a value of null to indicate nothing to read
      */
     String nextRowToRead();
+
+    /**
+     * Resets the state that (@method nextRowToRead) relies on, such that subsequent
+     * calls to nextRowToRead can, but not required to, return previously returned values.
+     *
+     * @throws UnsupportedOperationException if resetting of state is not supported by
+     * the implementation
+     */
+    default void reset() throws UnsupportedOperationException {
+        throw new UnsupportedOperationException("reset");
+    }
 }

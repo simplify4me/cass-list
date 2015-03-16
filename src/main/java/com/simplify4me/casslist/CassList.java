@@ -1,5 +1,7 @@
 package com.simplify4me.casslist;
 
+import javax.annotation.Nonnull;
+
 import com.netflix.astyanax.MutationBatch;
 import com.netflix.astyanax.connectionpool.exceptions.ConnectionException;
 
@@ -28,18 +30,13 @@ public interface CassList {
     void setEntryExpiryInSecs(int entryExpiryInSecs);
 
     /**
-     * @param readPolicy default read policy
-     */
-    void setDefaultReadPolicy(TimeBasedCassListReadPolicy readPolicy);
-
-    /**
      * Add an entry to the list
      *
      * @param value value
      * @return rowKey for row where the (key-value) were stored
      * @throws ConnectionException
      */
-    String add(String value) throws ConnectionException;
+    String add(@Nonnull String value) throws ConnectionException;
 
     /**
      * Add an entry to the list using a mutation batch that's already part of your write. Handy
@@ -49,24 +46,16 @@ public interface CassList {
      * @return rowKey for row where the (key-value) were stored
      * @throws ConnectionException
      */
-    String add(MutationBatch mutationBatch, String value) throws ConnectionException;
+    String add(@Nonnull MutationBatch mutationBatch, @Nonnull String value) throws ConnectionException;
 
     /**
-     * Read a set of entries based on the default read policy
+     * Read a set of entries
      *
+     * @param consumerName reading consumer name
      * @return entries read or null, if none available
      * @throws ConnectionException
      */
-    CassListEntries read() throws ConnectionException;
-
-    /**
-     * Read a set of entries using the given read policy (instead of default)
-     *
-     * @param readPolicy policy to use for read
-     * @return entries read or null, if none available
-     * @throws ConnectionException
-     */
-    CassListEntries read(CassListReadPolicy readPolicy) throws ConnectionException;
+    CassListEntries read(@Nonnull String consumerName) throws ConnectionException;
 
     /**
      * Mark the set of entries as read to avoid the same entries being returned by read, if desired.
@@ -76,5 +65,7 @@ public interface CassList {
      * @throws ConnectionException
      * @throws java.lang.UnsupportedOperationException
      */
-    void markAsRead(CassListEntries entry) throws UnsupportedOperationException, ConnectionException;
+    default void markAsRead(@Nonnull CassListEntries entry) throws UnsupportedOperationException, ConnectionException {
+        throw new UnsupportedOperationException("markAsRead");
+    }
 }

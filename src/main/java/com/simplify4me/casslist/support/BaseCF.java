@@ -20,20 +20,33 @@ import com.netflix.astyanax.query.ColumnFamilyQuery;
 public class BaseCF<K,C> extends ColumnFamily<K, C> {
 
     private Keyspace keyspace = null;
+    private ConsistencyLevel defaultCL = ConsistencyLevel.CL_LOCAL_QUORUM;
 
     public BaseCF(Keyspace keyspace, String columnFamilyName, Serializer<K> keySerializer, Serializer<C> columnSerializer) {
         super(columnFamilyName, keySerializer, columnSerializer);
         this.keyspace = keyspace;
     }
 
+    public void setDefaultCL(ConsistencyLevel consistencyLevel) {
+        this.defaultCL = consistencyLevel;
+    }
+
     public Keyspace getKeyspace() {
         return keyspace;
+    }
+
+    public ColumnFamilyQuery<K, C> prepareQuery() {
+        return prepareQuery(defaultCL);
     }
 
     public ColumnFamilyQuery<K, C> prepareQuery(ConsistencyLevel consistencyLevel) {
         ColumnFamilyQuery<K, C> cfQuery = getKeyspace().prepareQuery(this);
         cfQuery.setConsistencyLevel(consistencyLevel);
         return cfQuery;
+    }
+
+    public MutationBatch prepareMutationBatch() {
+        return prepareMutationBatch(defaultCL);
     }
 
     public MutationBatch prepareMutationBatch(ConsistencyLevel consistencyLevel) {

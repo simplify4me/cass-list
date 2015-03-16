@@ -7,7 +7,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.simplify4me.casslist.support.CassListCF;
-import com.simplify4me.casslist.support.TimeBasedCassListIndexBuilder;
+import com.simplify4me.casslist.support.LookbackInTimeReadPolicy;
 import junit.framework.Assert;
 
 import com.netflix.astyanax.AstyanaxContext;
@@ -55,12 +55,15 @@ public class CassListTest {
 
         final int numValues = 10;
 
-        CassList cassList = new TimeBasedCassList(cassListCF, new TimeBasedCassListIndexBuilder());
+        final TimeBasedCassListIndexBuilder indexBuilder = new TimeBasedCassListIndexBuilder("default");
+        final CassListReadPolicy readPolicy = LookbackInTimeReadPolicy.lookback5MinsPolicy(indexBuilder);
+        CassList cassList = new SimpleCassList(cassListCF, readPolicy, indexBuilder);
         writeABunchOfValues(cassList, numValues);
 
         int totalRead = 0;
 
-        for (CassListEntries entry = cassList.read(); entry != null; entry = cassList.read()) {
+        for (CassListEntries entry = cassList.read("t1"); totalRead < numValues; entry = cassList.read("t1")) {
+            if (entry == null) continue;
             System.out.println("eid=" + entry.getReferenceID());
             cassList.markAsRead(entry);
             totalRead += entry.size();
@@ -76,15 +79,15 @@ public class CassListTest {
 //
 //        final int numValues = 10;
 //
-//        TimeBasedCassList cassList = new TimeBasedCassList(ks, "llist");
-//        new ConcurrentCassListReader(cassList).read(new CassListEntryHandler() {
+//        TimeBasedCassList cassListCF = new TimeBasedCassList(ks, "llist");
+//        new ConcurrentCassListReader(cassListCF).read(new CassListEntryHandler() {
 //            @Override
 //            public void handle(CassListEntry entry) {
 //                System.out.println("read=" + entry);
 //            }
 //        });
 //
-//        writeABunchOfValues(cassList, numValues);
+//        writeABunchOfValues(cassListCF, numValues);
 //    }
 
     private static void writeABunchOfValues(CassList cassList, int numValues) throws Exception {
