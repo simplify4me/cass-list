@@ -1,6 +1,7 @@
 package com.simplify4me.casslist.support;
 
 import java.util.Date;
+import java.util.UUID;
 
 import com.netflix.astyanax.ColumnListMutation;
 import com.netflix.astyanax.Keyspace;

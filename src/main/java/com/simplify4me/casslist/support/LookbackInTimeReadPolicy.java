@@ -23,7 +23,7 @@ public class LookbackInTimeReadPolicy implements CassListReadPolicy {
 
     @Override
     public String nextRowToRead() {
-        long now = System.currentTimeMillis();
+        long now = System.currentTimeMillis()/1000;
         if (startFromSecs >= now) { //avoid reading the currently being written or future row
             return null;
         }
