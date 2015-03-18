@@ -61,6 +61,7 @@ public class CassListLockedListTest {
         CassListCF cassListCF = new CassListCF(context.getClient(), "llist");
 
         final int numValues = 10;
+        final int numConsumers = 3;
 
         final TimeBasedCassListIndexBuilder indexBuilder = new TimeBasedCassListIndexBuilder("default");
 
@@ -71,16 +72,16 @@ public class CassListLockedListTest {
         CassList cassList = new SimpleCassList(cassListCF, lockedListReadPolicy, indexBuilder);
         writeABunchOfValues(cassList, numValues);
 
-        final AtomicLong totalRead = new AtomicLong(0);
+        final ExecutorService executorService = Executors.newFixedThreadPool(numConsumers);
 
-        final ExecutorService executorService = Executors.newFixedThreadPool(5);
         final Map<String, String> trackingMap = new ConcurrentHashMap<>();
+        final Map<String, AtomicLong> totalRead = new ConcurrentHashMap<>();
 
         final Runnable task = new Runnable() {
             @Override
             public void run() {
                 try {
-                    final String consumer = Thread.currentThread().getId() + ".C";
+                    final String consumer = "Consumer-" + Thread.currentThread().getId();
                     final CassListEntries read = cassList.read(consumer);
                     if (read != null) {
                         System.out.println(read);
@@ -88,7 +89,8 @@ public class CassListLockedListTest {
                             System.err.println("existing key read=" + read.getReferenceID());
                         }
                         trackingMap.put(read.getReferenceID(), consumer);
-                        totalRead.addAndGet(read.size());
+                        final AtomicLong count = totalRead.computeIfAbsent(consumer, f -> new AtomicLong(0));
+                        count.addAndGet(read.size());
                         cassList.markAsRead(read);
                     }
 
@@ -99,19 +101,28 @@ public class CassListLockedListTest {
             }
         };
 
-        while (totalRead.get() < numValues) {
-            for (int index = 0; index < 3; index++) executorService.submit(task);
-            Thread.sleep(1000);
+        int numDone = 0;
+        do {
+            for (int index = 0; index < numConsumers; index++) executorService.submit(task);
+            Thread.sleep(10000);
+            for (AtomicLong count : totalRead.values()) {
+                if (count.get() >= numValues) {
+                    numDone++;
+                    break;
+                }
+            }
+            System.out.println(totalRead);
         }
+        while (numDone < numConsumers);
 
         executorService.shutdown();
         executorService.awaitTermination(15, TimeUnit.SECONDS);
-        System.out.println("total read=" + totalRead.get());
+        System.out.println("total read=" + totalRead);
     }
 
     private static void writeABunchOfValues(CassList cassList, int numValues) throws Exception {
         Random random = new Random();
-        for (int index = 0; index < 10; index++) {
+        for (int index = 0; index < numValues; index++) {
             cassList.add(String.valueOf(index));
             Thread.sleep(random.nextInt(1000));
         }

@@ -73,23 +73,6 @@ public class CassListTest {
         Assert.assertTrue(totalRead >= numValues);
     }
 
-//    @Test
-//    public void testConcurrentRW() throws Exception {
-//        final Keyspace ks = context.getClient();
-//
-//        final int numValues = 10;
-//
-//        TimeBasedCassList cassListCF = new TimeBasedCassList(ks, "llist");
-//        new ConcurrentCassListReader(cassListCF).read(new CassListEntryHandler() {
-//            @Override
-//            public void handle(CassListEntry entry) {
-//                System.out.println("read=" + entry);
-//            }
-//        });
-//
-//        writeABunchOfValues(cassListCF, numValues);
-//    }
-
     private static void writeABunchOfValues(CassList cassList, int numValues) throws Exception {
         Random random = new Random();
         for (int index = 0; index < 10; index++) {

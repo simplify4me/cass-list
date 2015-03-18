@@ -46,13 +46,12 @@ public class LockedListReadPolicy implements CassListReadPolicy {
     }
 
     @Override
-    public String nextRowToRead() {
+    public String nextRowToRead(@Nonnull String consumerName) {
         try {
-            final String rowToRead = delegatePolicy.nextRowToRead();
+            final String rowToRead = delegatePolicy.nextRowToRead(consumerName);
             if (rowToRead != null) {
                 final int bucket = rowToRead.hashCode() % numLocks;
-                if (cassLock.tryLock(listName + ":" + bucket)) {
-                    System.out.println("bucket=" + bucket + " rr:" + rowToRead);
+                if (cassLock.tryLock("L:" + listName + ":C:" + consumerName + ":B:" + bucket)) {
                     return rowToRead;
                 }
             }

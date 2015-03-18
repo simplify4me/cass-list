@@ -1,5 +1,11 @@
 package com.simplify4me.casslist.support;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+
+import javax.annotation.Nonnull;
+
 import com.simplify4me.casslist.CassListReadPolicy;
 import com.simplify4me.casslist.TimeBasedCassListIndexBuilder;
 
@@ -14,25 +20,26 @@ public class LookbackInTimeReadPolicy implements CassListReadPolicy {
     private final long initialStartTimeSecs;
     private final TimeBasedCassListIndexBuilder indexBuilder;
 
-    private volatile long startFromSecs = 0;
+    private final Map<String, AtomicLong> timeMap = new ConcurrentHashMap<>();
 
     public LookbackInTimeReadPolicy(TimeBasedCassListIndexBuilder indexBuilder, long startFromSecs) {
         this.indexBuilder = indexBuilder;
-        this.initialStartTimeSecs = this.startFromSecs = startFromSecs;
+        this.initialStartTimeSecs = startFromSecs;
     }
 
     @Override
-    public String nextRowToRead() {
+    public String nextRowToRead(@Nonnull String consumerName) {
         long now = System.currentTimeMillis()/1000;
-        if (startFromSecs >= now) { //avoid reading the currently being written or future row
+        AtomicLong time = timeMap.computeIfAbsent(consumerName, f -> new AtomicLong(initialStartTimeSecs));
+        if (time.longValue() >= now) { //avoid reading the currently being written or future row
             return null;
         }
-        return indexBuilder.build(startFromSecs++);
+        return indexBuilder.build(time.getAndIncrement());
     }
 
     @Override
     public void reset() {
-        this.startFromSecs = initialStartTimeSecs;
+        timeMap.clear();
     }
 
     public static CassListReadPolicy lookback5MinsPolicy(TimeBasedCassListIndexBuilder indexBuilder) {
