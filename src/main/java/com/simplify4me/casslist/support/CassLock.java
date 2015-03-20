@@ -32,18 +32,27 @@ public class CassLock {
 
     public boolean tryLock(String rowToLock) throws ConnectionException {
         final String lockRowKey = rowToLock + ".lock";
-        if (logger.isDebugEnabled()) logger.debug("tryLock=" + lockRowKey);
-        if (lockValue.equals(readLock(lockRowKey))) { //do i have the lock?
-            writeLock(lockRowKey); //refresh the lock i.e. extend ttl
-            return true;
+        final LockStatus lockStatus = getLockStatus(lockRowKey);
+        if (logger.isDebugEnabled()) {
+            logger.debug("tryLock=" + lockRowKey + "; lockStatus=" + String.valueOf(lockStatus));
         }
-        else { //i don't have the lock, try-lock
-            writeLock(lockRowKey);
-            if (lockValue.equals(readLock(lockRowKey))) return true;
-            else {
-                dropLock(lockRowKey);
+        switch (lockStatus) {
+            case OWN_LOCK:
+                writeLock(lockRowKey); //refresh the lock i.e. extend ttl
+                return true;
+            case NONE:
+                //i don't have the lock, try-lock
+                writeLock(lockRowKey);
+                if (getLockStatus(lockRowKey) == LockStatus.OWN_LOCK) {
+                    return true;
+                }
+                else {
+                    dropLock(lockRowKey);
+                    return false;
+                }
+            case MULTI_LOCK:
+            default:
                 return false;
-            }
         }
     }
 
@@ -59,15 +68,28 @@ public class CassLock {
         mutationBatch.execute();
     }
 
-    private String readLock(String lockRowKey) throws ConnectionException {
+    private LockStatus getLockStatus(String lockRowKey) throws ConnectionException {
         final OperationResult<ColumnList<UUID>> result = cassCF.prepareQuery()
             .getKey(lockRowKey).execute();
-        if (result != null && result.getResult().size() == 1) {
-            final Column<UUID> columnByName = result.getResult().getColumnByName(lockID);
-            if (columnByName != null) {
-                return columnByName.getStringValue();
+        if (result != null) {
+            if (result.getResult().size() == 1) {
+                final Column<UUID> columnByName = result.getResult().getColumnByName(lockID);
+                if (columnByName != null) {
+                    if (lockValue.equals(columnByName.getStringValue())) {
+                        return LockStatus.OWN_LOCK;
+                    }
+                }
+            }
+            else if (result.getResult().size() > 1) {
+                return LockStatus.MULTI_LOCK;
             }
         }
-        return null;
+        return LockStatus.NONE;
+    }
+
+    enum LockStatus {
+        OWN_LOCK,
+        MULTI_LOCK,
+        NONE
     }
 }

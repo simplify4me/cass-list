@@ -1,6 +1,6 @@
 package com.simplify4me.casslist;
 
-import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -8,6 +8,7 @@ import org.junit.Test;
 
 import com.simplify4me.casslist.support.CassListCF;
 import com.simplify4me.casslist.support.LookbackInTimeReadPolicy;
+import com.simplify4me.casslist.support.TimeInSec;
 import junit.framework.Assert;
 
 import com.netflix.astyanax.AstyanaxContext;
@@ -56,9 +57,12 @@ public class CassListTest {
         final int numValues = 10;
 
         final TimeBasedCassListIndexBuilder indexBuilder = new TimeBasedCassListIndexBuilder("default");
-        final CassListReadPolicy readPolicy = LookbackInTimeReadPolicy.lookback5MinsPolicy(indexBuilder);
+
+        final long startFromSecs = TimeInSec.minusSecs(5);
+        final CassListReadPolicy readPolicy = new LookbackInTimeReadPolicy(indexBuilder, startFromSecs);
+
         CassList cassList = new SimpleCassList(cassListCF, readPolicy, indexBuilder);
-        writeABunchOfValues(cassList, numValues);
+        CassListTestHelper.writeABunchOfValues(cassList, numValues);
 
         int totalRead = 0;
 
@@ -73,12 +77,4 @@ public class CassListTest {
         Assert.assertTrue(totalRead >= numValues);
     }
 
-    private static void writeABunchOfValues(CassList cassList, int numValues) throws Exception {
-        Random random = new Random();
-        for (int index = 0; index < 10; index++) {
-            cassList.add(String.valueOf(index));
-            Thread.sleep(random.nextInt(1000));
-        }
-        System.out.println("done writing");
-    }
 }

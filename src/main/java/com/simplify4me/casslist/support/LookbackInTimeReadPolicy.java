@@ -3,6 +3,7 @@ package com.simplify4me.casslist.support;
 import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.annotation.Nonnull;
@@ -31,30 +32,24 @@ public class LookbackInTimeReadPolicy implements CassListReadPolicy {
     public LookbackInTimeReadPolicy(TimeBasedCassListIndexBuilder indexBuilder, long startFromSecs) {
         this.indexBuilder = indexBuilder;
         this.initialStartTimeSecs = startFromSecs;
-        this.initialStartTimeDiffSecs = (System.currentTimeMillis()/1000) - startFromSecs;
+        this.initialStartTimeDiffSecs = TimeInSec.now() - startFromSecs;
     }
 
     @Override
     public String nextRowToRead(@Nonnull String readerName) {
-        long now = System.currentTimeMillis()/1000;
         AtomicLong time = timeMap.computeIfAbsent(readerName, f -> new AtomicLong(initialStartTimeSecs));
-        if (time.longValue() >= now) { //avoid reading the currently being written or future row
+        if (time.longValue() >= TimeInSec.now()) { //avoid reading the currently being written or future row
             return null;
         }
         if (logger.isDebugEnabled()) {
-            logger.debug("nextrowread=" + time.get() + ";" + new Date(time.get() * 1000));
+            logger.debug("next-row-read=" + time.get() + ";" + new Date(time.get() * 1000));
         }
         return indexBuilder.build(time.getAndIncrement());
     }
 
     @Override
     public void reset() {
-        this.initialStartTimeSecs = (System.currentTimeMillis()/1000) - this.initialStartTimeDiffSecs;
+        this.initialStartTimeSecs = TimeInSec.minusSecs(this.initialStartTimeDiffSecs);
         timeMap.clear();
-    }
-
-    public static CassListReadPolicy lookback5MinsPolicy(TimeBasedCassListIndexBuilder indexBuilder) {
-        final long startFrom = (System.currentTimeMillis() - (5 * 60 * 1000)); //5 mins
-        return new com.simplify4me.casslist.support.LookbackInTimeReadPolicy(indexBuilder, startFrom/1000);
     }
 }
