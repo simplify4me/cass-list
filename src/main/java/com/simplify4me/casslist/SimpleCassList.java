@@ -60,10 +60,10 @@ public class SimpleCassList implements CassList {
     }
 
     @Override
-    public CassListEntries read(@Nonnull String consumerName) throws ConnectionException {
-        final String rowToRead = this.readPolicy.nextRowToRead(consumerName);
+    public CassListEntries read(@Nonnull String readerName) throws ConnectionException {
+        final String rowToRead = this.readPolicy.nextRowToRead(readerName);
         if (rowToRead != null) {
-            String trackingKey = buildTrackingRowKey(consumerName, rowToRead);
+            String trackingKey = buildTrackingRowKey(readerName, rowToRead);
             final OperationResult<Rows<String, UUID>> result = this.cassListCF.prepareQuery()
                 .getKeySlice(trackingKey, rowToRead).execute();
             if (result != null && !result.getResult().isEmpty()) {
@@ -76,21 +76,21 @@ public class SimpleCassList implements CassList {
                 if (!dataCols.isEmpty()) {
                     Set<Column<UUID>> set = new HashSet<>(dataCols.size(), 1.0f);
                     dataCols.forEach(c -> set.add(dataRow.getColumns().getColumnByName(c)));
-                    return new CassListEntries(consumerName, rowToRead, set);
+                    return new CassListEntries(readerName, rowToRead, set);
                 }
             }
         }
         return null;
     }
 
-    private String buildTrackingRowKey(String consumerName, String rowToRead) {
-        return rowToRead + ".reader." + consumerName;
+    private String buildTrackingRowKey(String readerName, String rowToRead) {
+        return rowToRead + ".reader." + readerName;
     }
 
     @Override
     public void markAsRead(@Nonnull CassListEntries entry) throws ConnectionException {
         if (entry.size() == 0) return;
-        final String trackingKey = buildTrackingRowKey(entry.getConsumerName(), entry.getReferenceID());
+        final String trackingKey = buildTrackingRowKey(entry.getReaderName(), entry.getReferenceID());
         final MutationBatch mutationBatch = cassListCF.prepareMutationBatch();
         final ColumnListMutation<UUID> mutation = mutationBatch.withRow(cassListCF, trackingKey);
         entry.getEntries().forEach(e -> mutation.putColumn(e.getName(), 1, entryExpiryInSecs));

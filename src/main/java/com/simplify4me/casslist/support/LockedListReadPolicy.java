@@ -11,9 +11,9 @@ import com.netflix.astyanax.connectionpool.exceptions.ConnectionException;
  * for any read. This is useful when you want to limit processing of any given entry to one
  * thread at any point in time.
  *
- * The number of locks defaults to 1 'lock' but it can be configured to a higher value to allow
- * for multiple processes reading entries off of the list. The allocation of keys to locks is done
- * via lock = key.hashCode % numLocks and only processes/threads that own the lock for that partition
+ * The number of concurrent readers defaults to 1 'lock' but it can be configured to a higher value to allow
+ * for concurrent reading of entries from the list. The allocation of keys to locks is done
+ * via lock = key.hashCode % numConcurrentReaders and only threads that own the lock for that partition
  * can process a given key.
  *
  * The lock expires in a pre-defined amount of time, so
@@ -28,7 +28,7 @@ public class LockedListReadPolicy implements CassListReadPolicy {
     private final CassLock cassLock;
     private final CassListReadPolicy delegatePolicy;
 
-    private int numLocks = 1;
+    private int numConcurrentReaders = 1;
 
     public LockedListReadPolicy(@Nonnull CassListCF cassListCF,
                                 @Nonnull CassListReadPolicy readPolicy,
@@ -40,18 +40,18 @@ public class LockedListReadPolicy implements CassListReadPolicy {
         this.cassLock = new CassLock(cassListCF, Integer.valueOf(300)); //5 mins
     }
 
-    public void setNumLocks(int numLocks) {
-        if (numLocks < 1) throw new IllegalStateException();
-        this.numLocks = numLocks;
+    public void setNumConcurrentReaders(int numConcurrentReaders) {
+        if (numConcurrentReaders < 1) throw new IllegalStateException();
+        this.numConcurrentReaders = numConcurrentReaders;
     }
 
     @Override
-    public String nextRowToRead(@Nonnull String consumerName) {
+    public String nextRowToRead(@Nonnull String readerName) {
         try {
-            final String rowToRead = delegatePolicy.nextRowToRead(consumerName);
+            final String rowToRead = delegatePolicy.nextRowToRead(readerName);
             if (rowToRead != null) {
-                final int bucket = rowToRead.hashCode() % numLocks;
-                if (cassLock.tryLock("L:" + listName + ":C:" + consumerName + ":B:" + bucket)) {
+                final int bucket = rowToRead.hashCode() % numConcurrentReaders;
+                if (cassLock.tryLock("L:" + listName + ":C:" + readerName + ":B:" + bucket)) {
                     return rowToRead;
                 }
             }

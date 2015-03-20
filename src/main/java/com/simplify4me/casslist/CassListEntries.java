@@ -13,11 +13,11 @@ import com.netflix.astyanax.model.Column;
  */
 public class CassListEntries {
     private final String referenceID;
-    private final String consumerName;
+    private final String readerName;
     private final Set<Column<UUID>> entries;
 
-    public CassListEntries(@Nonnull String consumerName, @Nonnull String referenceID, @Nonnull Set<Column<UUID>> entries) {
-        this.consumerName = consumerName;
+    public CassListEntries(@Nonnull String readerName, @Nonnull String referenceID, @Nonnull Set<Column<UUID>> entries) {
+        this.readerName = readerName;
         this.referenceID = referenceID;
         this.entries = entries;
     }
@@ -26,8 +26,8 @@ public class CassListEntries {
         return referenceID;
     }
 
-    public String getConsumerName() {
-        return consumerName;
+    public String getReaderName() {
+        return readerName;
     }
 
     public Iterator<String> iterator() {

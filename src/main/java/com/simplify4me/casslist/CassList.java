@@ -51,11 +51,11 @@ public interface CassList {
     /**
      * Read a set of entries
      *
-     * @param consumerName reading consumer name
+     * @param readerName reader name
      * @return entries read or null, if none available
      * @throws ConnectionException
      */
-    CassListEntries read(@Nonnull String consumerName) throws ConnectionException;
+    CassListEntries read(@Nonnull String readerName) throws ConnectionException;
 
     /**
      * Mark the set of entries as read to avoid the same entries being returned by read, if desired.

@@ -1,10 +1,13 @@
 package com.simplify4me.casslist.support;
 
+import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.annotation.Nonnull;
+
+import org.apache.log4j.Logger;
 
 import com.simplify4me.casslist.CassListReadPolicy;
 import com.simplify4me.casslist.TimeBasedCassListIndexBuilder;
@@ -17,7 +20,10 @@ import com.simplify4me.casslist.TimeBasedCassListIndexBuilder;
  */
 public class LookbackInTimeReadPolicy implements CassListReadPolicy {
 
-    private final long initialStartTimeSecs;
+    private static final Logger logger = Logger.getLogger(LookbackInTimeReadPolicy.class);
+
+    private long initialStartTimeSecs = 0;
+    private final long initialStartTimeDiffSecs;
     private final TimeBasedCassListIndexBuilder indexBuilder;
 
     private final Map<String, AtomicLong> timeMap = new ConcurrentHashMap<>();
@@ -25,20 +31,25 @@ public class LookbackInTimeReadPolicy implements CassListReadPolicy {
     public LookbackInTimeReadPolicy(TimeBasedCassListIndexBuilder indexBuilder, long startFromSecs) {
         this.indexBuilder = indexBuilder;
         this.initialStartTimeSecs = startFromSecs;
+        this.initialStartTimeDiffSecs = (System.currentTimeMillis()/1000) - startFromSecs;
     }
 
     @Override
-    public String nextRowToRead(@Nonnull String consumerName) {
+    public String nextRowToRead(@Nonnull String readerName) {
         long now = System.currentTimeMillis()/1000;
-        AtomicLong time = timeMap.computeIfAbsent(consumerName, f -> new AtomicLong(initialStartTimeSecs));
+        AtomicLong time = timeMap.computeIfAbsent(readerName, f -> new AtomicLong(initialStartTimeSecs));
         if (time.longValue() >= now) { //avoid reading the currently being written or future row
             return null;
+        }
+        if (logger.isDebugEnabled()) {
+            logger.debug("nextrowread=" + time.get() + ";" + new Date(time.get() * 1000));
         }
         return indexBuilder.build(time.getAndIncrement());
     }
 
     @Override
     public void reset() {
+        this.initialStartTimeSecs = (System.currentTimeMillis()/1000) - this.initialStartTimeDiffSecs;
         timeMap.clear();
     }
 

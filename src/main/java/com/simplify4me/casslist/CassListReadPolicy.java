@@ -19,10 +19,10 @@ public interface CassListReadPolicy {
      *
      * This method shall not throw an exception and fail.
      *
-     * @param consumerName consumer name
+     * @param readerName reader name
      * @return a row key to read or a value of null to indicate nothing to read
      */
-    String nextRowToRead(@Nonnull String consumerName);
+    String nextRowToRead(@Nonnull String readerName);
 
     /**
      * Resets the state that (@method nextRowToRead) relies on, such that subsequent

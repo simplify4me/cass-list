@@ -2,6 +2,8 @@ package com.simplify4me.casslist.support;
 
 import java.util.UUID;
 
+import org.apache.log4j.Logger;
+
 import com.netflix.astyanax.MutationBatch;
 import com.netflix.astyanax.connectionpool.OperationResult;
 import com.netflix.astyanax.connectionpool.exceptions.ConnectionException;
@@ -14,6 +16,8 @@ import com.netflix.astyanax.util.TimeUUIDUtils;
  * Helper class
  */
 public class CassLock {
+
+    private static final Logger logger = Logger.getLogger(CassLock.class);
 
     private final UUID lockID = TimeUUIDUtils.getUniqueTimeUUIDinMillis();
     private final String lockValue = lockID.toString();
@@ -28,6 +32,7 @@ public class CassLock {
 
     public boolean tryLock(String rowToLock) throws ConnectionException {
         final String lockRowKey = rowToLock + ".lock";
+        if (logger.isDebugEnabled()) logger.debug("tryLock=" + lockRowKey);
         if (lockValue.equals(readLock(lockRowKey))) { //do i have the lock?
             writeLock(lockRowKey); //refresh the lock i.e. extend ttl
             return true;
@@ -43,13 +48,13 @@ public class CassLock {
     }
 
     private void dropLock(String lockRowKey) throws ConnectionException {
-        final MutationBatch mutationBatch = cassCF.prepareMutationBatch(ConsistencyLevel.CL_LOCAL_QUORUM);
+        final MutationBatch mutationBatch = cassCF.prepareMutationBatch();
         mutationBatch.withRow(cassCF, lockRowKey).deleteColumn(lockID);
-        mutationBatch.executeAsync();
+        mutationBatch.execute();
     }
 
     private void writeLock(String lockRowKey) throws ConnectionException {
-        MutationBatch mutationBatch = cassCF.prepareMutationBatch(ConsistencyLevel.CL_LOCAL_QUORUM);
+        MutationBatch mutationBatch = cassCF.prepareMutationBatch();
         mutationBatch.withRow(cassCF, lockRowKey).putColumn(lockID, lockValue, lockExpiryInSecs);
         mutationBatch.execute();
     }
