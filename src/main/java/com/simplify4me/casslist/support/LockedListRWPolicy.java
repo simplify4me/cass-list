@@ -37,7 +37,7 @@ public class LockedListRWPolicy implements CassListRWPolicy {
     @Override
     public String nextRowToRead(@Nonnull String listName, @Nonnull String readerName) {
         try {
-            if (cassLock.tryLock("L:" + listName + ":C:" + readerName)) {
+            if (cassLock.tryLock(listName + ".lock.reader." + readerName)) {
                 return delegatePolicy.nextRowToRead(listName, readerName);
             }
         }

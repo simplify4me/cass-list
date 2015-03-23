@@ -30,8 +30,7 @@ public class CassLock {
         this.lockExpiryInSecs = lockExpiryInSecs;
     }
 
-    public boolean tryLock(String rowToLock) throws ConnectionException {
-        final String lockRowKey = rowToLock + ".lock";
+    public boolean tryLock(String lockRowKey) throws ConnectionException {
         final LockStatus lockStatus = getLockStatus(lockRowKey);
         if (logger.isDebugEnabled()) {
             logger.debug("tryLock=" + lockRowKey + "; lockStatus=" + String.valueOf(lockStatus));
