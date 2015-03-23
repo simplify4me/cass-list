@@ -14,9 +14,9 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.simplify4me.casslist.support.CassListCF;
-import com.simplify4me.casslist.support.LockedListReadPolicy;
-import com.simplify4me.casslist.support.LookbackInTimeReadPolicy;
-import com.simplify4me.casslist.support.TimeBasedCassListBuilder;
+import com.simplify4me.casslist.support.CassLock;
+import com.simplify4me.casslist.support.LockedListRWPolicy;
+import com.simplify4me.casslist.support.TimeBasedRWPolicy;
 import com.simplify4me.casslist.support.TimeInSec;
 
 import com.netflix.astyanax.AstyanaxContext;
@@ -66,8 +66,12 @@ public class CassListLockedListTest {
         final int numValues = 10;
         final int numReaders = 4;
 
-        CassList cassList = new TimeBasedCassListBuilder(cassListCF, "default")
-            .withLookback(5).build();
+        final TimeBasedRWPolicy rwPolicy = new TimeBasedRWPolicy(TimeInSec.minusSecs(5));
+
+        final LockedListRWPolicy lockedRWPolicy = new LockedListRWPolicy(
+            new CassLock(cassListCF, Integer.valueOf(300)), rwPolicy);
+
+        final CassList cassList = new SimpleCassList("default", cassListCF, lockedRWPolicy);
 
         final Set<String> valueSet = CassListTestHelper.writeABunchOfValues(cassList, numValues);
         System.out.println("wrote=" + valueSet);

@@ -2,7 +2,7 @@ package com.simplify4me.casslist.support;
 
 import javax.annotation.Nonnull;
 
-import com.simplify4me.casslist.CassListReadPolicy;
+import com.simplify4me.casslist.CassListRWPolicy;
 
 import com.netflix.astyanax.connectionpool.exceptions.ConnectionException;
 
@@ -17,27 +17,28 @@ import com.netflix.astyanax.connectionpool.exceptions.ConnectionException;
  * the expected SLA
  *
  */
-public class LockedListReadPolicy implements CassListReadPolicy {
+public class LockedListRWPolicy implements CassListRWPolicy {
 
-    private final String listName;
     private final CassLock cassLock;
-    private final CassListReadPolicy delegatePolicy;
+    private final CassListRWPolicy delegatePolicy;
 
-    public LockedListReadPolicy(@Nonnull CassListCF cassListCF,
-                                @Nonnull CassListReadPolicy readPolicy,
-                                @Nonnull String listName) {
+    public LockedListRWPolicy(@Nonnull CassLock cassLock,
+                              @Nonnull CassListRWPolicy delegate) {
 
-        this.delegatePolicy = readPolicy;
-        this.listName = listName;
-
-        this.cassLock = new CassLock(cassListCF, Integer.valueOf(300)); //5 mins
+        this.delegatePolicy = delegate;
+        this.cassLock = cassLock;
     }
 
     @Override
-    public String nextRowToRead(@Nonnull String readerName) {
+    public String rowKey(@Nonnull String listName) {
+        return delegatePolicy.rowKey(listName);
+    }
+
+    @Override
+    public String nextRowToRead(@Nonnull String listName, @Nonnull String readerName) {
         try {
             if (cassLock.tryLock("L:" + listName + ":C:" + readerName)) {
-                return delegatePolicy.nextRowToRead(readerName);
+                return delegatePolicy.nextRowToRead(listName, readerName);
             }
         }
         catch (ConnectionException e) {

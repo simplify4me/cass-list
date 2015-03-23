@@ -3,9 +3,20 @@ package com.simplify4me.casslist;
 import javax.annotation.Nonnull;
 
 /**
- * A policy that drives which values are read from the list.
+ * A policy that drives values read and written from/to the list.
  */
-public interface CassListReadPolicy {
+public interface CassListRWPolicy {
+
+    /**
+     * Returns an appropriate row key for storing the value. The behavior of this method shall be
+     * implementation specific.
+     *
+     * This method shall not throw an exception and fail.
+     *
+     * @param listName name of the list
+     * @return a row key to store the value against
+     */
+    String rowKey(@Nonnull String listName);
 
     /**
      * Returns the next row to read. The behavior of this method shall be
@@ -19,19 +30,9 @@ public interface CassListReadPolicy {
      *
      * This method shall not throw an exception and fail.
      *
+     * @param  listName name of the list
      * @param readerName reader name
      * @return a row key to read or a value of null to indicate nothing to read
      */
-    String nextRowToRead(@Nonnull String readerName);
-
-    /**
-     * Resets the state that (@method nextRowToRead) relies on, such that subsequent
-     * calls to nextRowToRead can, but not required to, return previously returned values.
-     *
-     * @throws UnsupportedOperationException if resetting of state is not supported by
-     * the implementation
-     */
-    default void reset() throws UnsupportedOperationException {
-        throw new UnsupportedOperationException("reset");
-    }
+    String nextRowToRead(@Nonnull String listName, @Nonnull String readerName);
 }

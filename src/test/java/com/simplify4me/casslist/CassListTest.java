@@ -1,13 +1,11 @@
 package com.simplify4me.casslist;
 
-import java.util.concurrent.TimeUnit;
-
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.simplify4me.casslist.support.CassListCF;
-import com.simplify4me.casslist.support.LookbackInTimeReadPolicy;
+import com.simplify4me.casslist.support.TimeBasedRWPolicy;
 import com.simplify4me.casslist.support.TimeInSec;
 import junit.framework.Assert;
 
@@ -56,12 +54,10 @@ public class CassListTest {
 
         final int numValues = 10;
 
-        final TimeBasedCassListIndexBuilder indexBuilder = new TimeBasedCassListIndexBuilder("default");
-
         final long startFromSecs = TimeInSec.minusSecs(5);
-        final CassListReadPolicy readPolicy = new LookbackInTimeReadPolicy(indexBuilder, startFromSecs);
+        final CassListRWPolicy readPolicy = new TimeBasedRWPolicy(startFromSecs);
 
-        CassList cassList = new SimpleCassList(cassListCF, readPolicy, indexBuilder);
+        CassList cassList = new SimpleCassList("default", cassListCF, readPolicy);
         CassListTestHelper.writeABunchOfValues(cassList, numValues);
 
         int totalRead = 0;

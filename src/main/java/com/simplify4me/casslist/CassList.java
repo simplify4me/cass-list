@@ -30,6 +30,11 @@ public interface CassList {
     void setEntryExpiryInSecs(int entryExpiryInSecs);
 
     /**
+     * @return name of this list
+     */
+    String getName();
+
+    /**
      * Add an entry to the list
      *
      * @param value value

@@ -27,14 +27,19 @@ public class SimpleCassList implements CassList {
 
     protected Integer entryExpiryInSecs = Integer.valueOf(600);
 
+    private final String name;
     protected final CassListCF cassListCF;
-    protected final CassListReadPolicy readPolicy;
-    protected final CassListIndexBuilder indexBuilder;
+    protected final CassListRWPolicy rwPolicy;
 
-    public SimpleCassList(CassListCF cassListCF, CassListReadPolicy readPolicy, CassListIndexBuilder indexBuilder) {
+    public SimpleCassList(String name, CassListCF cassListCF, CassListRWPolicy rwPolicy) {
+        this.name = name;
         this.cassListCF = cassListCF;
-        this.readPolicy = readPolicy;
-        this.indexBuilder = indexBuilder;
+        this.rwPolicy = rwPolicy;
+    }
+
+    @Override
+    public String getName() {
+        return name;
     }
 
     @Override
@@ -52,7 +57,7 @@ public class SimpleCassList implements CassList {
 
     @Override
     public String add(@Nonnull MutationBatch mutationBatch, @Nonnull String value) throws ConnectionException {
-        final String rowKey = indexBuilder.build();
+        final String rowKey = rwPolicy.rowKey(this.name);
         final UUID timeUUID = TimeUUIDUtils.getUniqueTimeUUIDinMicros();
         mutationBatch.withRow(cassListCF, rowKey)
             .putColumn(timeUUID, value, entryExpiryInSecs);
@@ -61,7 +66,7 @@ public class SimpleCassList implements CassList {
 
     @Override
     public CassListEntries read(@Nonnull String readerName) throws ConnectionException {
-        final String rowToRead = this.readPolicy.nextRowToRead(readerName);
+        final String rowToRead = this.rwPolicy.nextRowToRead(this.name, readerName);
         if (rowToRead != null) {
             String trackingKey = buildTrackingRowKey(readerName, rowToRead);
             final OperationResult<Rows<String, UUID>> result = this.cassListCF.prepareQuery()
